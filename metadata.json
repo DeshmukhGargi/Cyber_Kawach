@@ -1,0 +1,6 @@
+{
+  "name": "Cyber Kawach - AI Scam Detection & Cyber Awareness",
+  "description": "AI-powered scam detection and cybersecurity awareness platform for emails, WhatsApp, SMS, and suspicious URLs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

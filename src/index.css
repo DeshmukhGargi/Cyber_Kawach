@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mint-bg: #F7FCFA;
+  --color-card-bg: #FFFFFF;
+  --color-sky: #38BDF8;
+  --color-sky-hover: #0EA5E9;
+  --color-mint-soft: #B8F2E6;
+  --color-teal-dark: #183B3A;
+  --color-teal-text: #526766;
+  --color-teal-link: #176B61;
+  --color-mint-hover: #E8F8F5;
+  --color-border-subtle: #DCEBE7;
+  --color-status-safe: #22C55E;
+  --color-status-moderate: #F59E0B;
+  --color-status-scam: #EF4444;
+  --color-status-critical: #B91C1C;
+}
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #F7FCFA;
+    color: #183B3A;
+    overflow-x: hidden;
+  }
+  
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Background Grid - Fresh Mint & Sky Blue Subtle Accents */
+.cyber-grid {
+  background-image: radial-gradient(rgba(56, 189, 248, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.cyber-grid-dense {
+  background-image: radial-gradient(rgba(23, 107, 97, 0.08) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* Card Styling - Fresh Mint + White + Subtle Teal Borders */
+.glass-panel {
+  background: #FFFFFF;
+  border: 1px solid #DCEBE7;
+  box-shadow: 0 4px 20px -2px rgba(24, 59, 58, 0.04), 0 2px 6px -1px rgba(24, 59, 58, 0.02);
+}
+
+.glass-panel-elevated {
+  background: #FFFFFF;
+  border: 1px solid #DCEBE7;
+  box-shadow: 0 10px 30px -4px rgba(24, 59, 58, 0.06), 0 4px 12px -2px rgba(24, 59, 58, 0.03);
+}
+
+.glass-panel-glow {
+  background: #FFFFFF;
+  border: 1px solid #38BDF8;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.18), 0 8px 24px -4px rgba(24, 59, 58, 0.05);
+}
+
+/* Primary Sky Blue Action Button Styles */
+.neon-glow-cyan-btn {
+  background-color: #38BDF8;
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3);
+  font-weight: 700;
+}
+
+.neon-glow-cyan-btn:hover {
+  background-color: #0EA5E9;
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.45);
+}
+
+/* Floating Logo & Cyber Keyframe Animations */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-18px) rotate(2deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(16px) rotate(-2.5deg);
+  }
+}
+
+@keyframes float-drift {
+  0%, 100% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  33% {
+    transform: translate(12px, -14px) rotate(1.5deg);
+  }
+  66% {
+    transform: translate(-10px, 12px) rotate(-1deg);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 0.18;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes cyber-neon-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.98);
+    filter: blur(45px);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+    filter: blur(60px);
+  }
+}
+
+.animate-neon-pulse {
+  animation: cyber-neon-pulse 5s ease-in-out infinite;
+}
+
+@keyframes scanline-laser {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 12s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 15s ease-in-out infinite;
+}
+
+.animate-float-drift {
+  animation: float-drift 18s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 6s ease-in-out infinite;
+}
+
+.animate-scanline {
+  animation: scanline-laser 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Accessibility: respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-float-reverse,
+  .animate-float-drift,
+  .animate-pulse-soft,
+  .animate-scanline {
+    animation: none !important;
+    transform: none !important;
+  }
+}

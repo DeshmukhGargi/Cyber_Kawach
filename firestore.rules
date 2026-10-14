@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User profile documents: Only authenticated owner can read/write
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Scans subcollection: Strictly owner-only read, create, delete (scans are immutable audit logs)
+      match /scans/{scanId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null 
+          && request.auth.uid == userId 
+          && request.resource.data.userId == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+        allow update: if false;
+      }
+
+      // Quiz attempts subcollection: Owner read, create, delete
+      match /quizAttempts/{attemptId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null 
+          && request.auth.uid == userId 
+          && request.resource.data.userId == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+        allow update: if false;
+      }
+
+      // Scam detective challenges subcollection: Owner read, create, update
+      match /scamDetective/{attemptId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null 
+          && request.auth.uid == userId 
+          && request.resource.data.userId == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}

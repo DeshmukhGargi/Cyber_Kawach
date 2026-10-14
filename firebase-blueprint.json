@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile metadata",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": ["userId", "email"]
+    },
+    "UserScan": {
+      "title": "UserScan",
+      "description": "Record of a security scan performed by an authenticated user",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user ID"
+        },
+        "type": {
+          "type": "string",
+          "description": "Scan type (email, whatsapp, sms, or url)"
+        },
+        "riskScore": {
+          "type": "number",
+          "description": "Calculated risk score between 0 and 100"
+        },
+        "category": {
+          "type": "string",
+          "description": "Verdict category: SAFE, MODERATE, SCAM, or DO NOT TOUCH"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of the scan"
+        },
+        "scamType": {
+          "type": "string",
+          "description": "Identified scam category or benign designation"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Safe summary or snippet of analyzed content"
+        },
+        "indicators": {
+          "type": "array",
+          "description": "List of detected threat indicators"
+        }
+      },
+      "required": ["userId", "type", "riskScore", "category", "timestamp", "scamType"]
+    },
+    "QuizAttempt": {
+      "title": "QuizAttempt",
+      "description": "Completed cyber awareness quiz attempt",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "accuracy": { "type": "number" },
+        "domainScores": { "type": "object" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "mode": { "type": "string" }
+      },
+      "required": ["userId", "score", "totalQuestions", "accuracy", "completedAt"]
+    },
+    "ScamDetectiveAttempt": {
+      "title": "ScamDetectiveAttempt",
+      "description": "Completed scam detective red-flag challenge",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "challengeId": { "type": "string" },
+        "identifiedCount": { "type": "number" },
+        "totalRedFlags": { "type": "number" },
+        "successRate": { "type": "number" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "challengeId", "identifiedCount", "totalRedFlags", "completedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Profile information for the authenticated user"
+    },
+    "/users/{userId}/scans/{scanId}": {
+      "schema": "UserScan",
+      "description": "Scan history items belonging strictly to the authenticated user"
+    },
+    "/users/{userId}/quizAttempts/{attemptId}": {
+      "schema": "QuizAttempt",
+      "description": "Quiz performance records for adaptive scoring"
+    },
+    "/users/{userId}/scamDetective/{attemptId}": {
+      "schema": "ScamDetectiveAttempt",
+      "description": "Scam detective challenge records"
+    }
+  }
+}
