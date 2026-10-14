@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -13,10 +14,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+// AI Studio requirement: The app server must run on port 3000.
+// In Cloud Run containers, Nginx binds to 8080 and reverse-proxies to 3000.
+// If process.env.PORT is 8080, binding to it causes an EADDRINUSE crash with Nginx.
+function getPort(): number {
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    const parsed = parseInt(process.argv[portArgIndex + 1], 10);
+    if (!isNaN(parsed) && parsed !== 8080) return parsed;
+  }
+  if (process.env.PORT && process.env.PORT !== '8080') {
+    const parsed = parseInt(process.env.PORT, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return 3000;
+}
+
+const PORT = getPort();
 
 // Security headers and API endpoint configuration
-app.use('/api', (req, res, next) => {
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -35,7 +53,7 @@ app.use('/api', (req, res, next) => {
 app.use(express.json({ limit: '500kb' }));
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: 'Cyber Kawach Backend',
@@ -46,7 +64,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Threat intelligence live feed endpoint
-app.get('/api/threat-intelligence', async (req, res) => {
+app.get('/api/threat-intelligence', async (req: Request, res: Response) => {
   try {
     const data = await fetchThreatIntelligence();
     res.json(data);
@@ -60,7 +78,7 @@ app.get('/api/threat-intelligence', async (req, res) => {
 });
 
 // Master analysis endpoint
-app.post('/api/analyze', async (req, res) => {
+app.post('/api/analyze', async (req: Request, res: Response) => {
   try {
     const { type, content, subject, sender } = req.body;
 
@@ -115,7 +133,7 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 // JSON fallback for any unhandled /api route so it never leaks HTML to the client
-app.all('/api/*', (req, res) => {
+app.all('/api/*', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: `API endpoint not found: ${req.method} ${req.originalUrl}`,
@@ -123,7 +141,7 @@ app.all('/api/*', (req, res) => {
 });
 
 // Error handling middleware specifically for /api routes
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (req.originalUrl?.startsWith('/api') || req.path?.startsWith('/api')) {
     console.error('Unhandled API exception caught:', err);
     return res.status(err.status || 500).json({
@@ -139,7 +157,7 @@ async function setupServer() {
   const distPath = path.resolve(__dirname, 'dist');
   const distIndexHtml = path.resolve(distPath, 'index.html');
   const hasDist = fs.existsSync(distIndexHtml);
-  const isProduction = process.env.NODE_ENV === 'production' || hasDist;
+  const isProduction = process.env.NODE_ENV === 'production' || (hasDist && process.env.NODE_ENV !== 'development');
 
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
@@ -150,7 +168,7 @@ async function setupServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (req: Request, res: Response) => {
       res.sendFile(distIndexHtml);
     });
   }
