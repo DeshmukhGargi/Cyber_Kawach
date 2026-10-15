@@ -40,26 +40,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    if (!email.trim() || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
       setErrorMessage('Please enter both your email address and password.');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setErrorMessage('Please enter a valid email address format (e.g. name@example.com).');
       return;
     }
 
     setLoading(true);
     try {
-      await login(email, password);
+      await login(normalizedEmail, password);
       setSuccessMessage('Successfully signed in. Loading your dashboard...');
       setTimeout(() => {
         onNavigate('dashboard');
-      }, 1000);
+      }, 900);
     } catch (err: any) {
       console.error('Login error:', err);
-      // Safe generic message so we don't expose whether specific emails are registered
-      let msg = 'Invalid email or password combination. Please try again.';
-      if (err.code === 'auth/invalid-email') {
-        msg = 'The format of the email address is invalid.';
+      let msg = err.message || 'Invalid email or password combination. Please try again.';
+      if (err.isNetworkError || err.message?.includes('Network error') || err.message?.includes('network')) {
+        msg = 'Network connection failed: Unable to connect to authentication server. Please check your internet connection.';
       } else if (err.code === 'auth/too-many-requests') {
         msg = 'Too many failed login attempts. Please wait a few minutes before retrying.';
+      } else if (err.code === 'auth/invalid-email' || err.message?.includes('valid email')) {
+        msg = 'The format of the email address is invalid.';
       }
       setErrorMessage(msg);
     } finally {

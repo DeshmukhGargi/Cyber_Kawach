@@ -107,7 +107,7 @@ export async function saveQuizAttempt(
 
   saveLocalQuizAttempt(fullAttempt);
 
-  if (userId) {
+  if (userId && db) {
     try {
       const docRef = doc(db, 'users', userId, 'quizAttempts', attemptId);
       await setDoc(docRef, {
@@ -123,7 +123,7 @@ export async function saveQuizAttempt(
 }
 
 export async function fetchUserQuizAttempts(userId: string | null): Promise<QuizAttempt[]> {
-  if (!userId) {
+  if (!userId || !db) {
     return getLocalQuizAttempts();
   }
   try {
@@ -157,7 +157,7 @@ export async function saveScamDetectiveRecord(
 
   saveLocalDetectiveRecord(fullRecord);
 
-  if (userId) {
+  if (userId && db) {
     try {
       const docRef = doc(db, 'users', userId, 'scamDetective', record.challengeId);
       await setDoc(docRef, {
@@ -173,7 +173,7 @@ export async function saveScamDetectiveRecord(
 }
 
 export async function fetchUserDetectiveRecords(userId: string | null): Promise<ScamDetectiveRecord[]> {
-  if (!userId) {
+  if (!userId || !db) {
     return getLocalDetectiveRecords();
   }
   try {

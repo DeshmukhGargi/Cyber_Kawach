@@ -50,17 +50,20 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const trimmedName = fullName.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
     // 1. Validate fields
-    if (!fullName.trim()) {
-      setErrorMessage('Please enter your full name.');
+    if (!trimmedName || trimmedName.length < 2) {
+      setErrorMessage('Please enter your full name (at least 2 characters).');
       return;
     }
-    if (!email.trim()) {
+    if (!normalizedEmail) {
       setErrorMessage('Please enter your email address.');
       return;
     }
-    if (!validateEmail(email)) {
-      setErrorMessage('Please enter a valid email address format.');
+    if (!validateEmail(normalizedEmail)) {
+      setErrorMessage('Please enter a valid email address format (e.g. name@example.com).');
       return;
     }
     if (!password) {
@@ -72,7 +75,7 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMessage('Password confirmation does not match.');
+      setErrorMessage('Password confirmation does not match. Please re-enter.');
       return;
     }
     if (!acceptTerms) {
@@ -82,7 +85,7 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
 
     setLoading(true);
     try {
-      await register(email, password, fullName);
+      await register(normalizedEmail, password, trimmedName);
       try {
         await sendVerificationEmail();
       } catch {
@@ -91,16 +94,18 @@ export const SignUpPage: React.FC<SignUpPageProps> = ({ onNavigate }) => {
       setSuccessMessage('Account created successfully! Your personal defense dashboard is ready.');
       setTimeout(() => {
         onNavigate('dashboard');
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
       console.error('Registration failed:', err);
-      let msg = 'Registration failed. Please check your credentials.';
-      if (err.code === 'auth/email-already-in-use') {
+      let msg = err.message || 'Registration encountered an error. Please try again.';
+      if (err.code === 'auth/email-already-in-use' || err.message?.includes('already exists')) {
         msg = 'An account with this email address already exists. Please sign in instead.';
-      } else if (err.code === 'auth/weak-password') {
-        msg = 'Password is too weak. Please use at least 6 characters with numbers and letters.';
-      } else if (err.code === 'auth/invalid-email') {
-        msg = 'The provided email address is invalid.';
+      } else if (err.code === 'auth/weak-password' || err.message?.includes('too weak')) {
+        msg = 'Password is too weak. Please use at least 6 characters with a combination of letters and numbers.';
+      } else if (err.code === 'auth/invalid-email' || err.message?.includes('valid email')) {
+        msg = 'The provided email address format is invalid.';
+      } else if (err.isNetworkError || err.message?.includes('Network error') || err.message?.includes('network')) {
+        msg = 'Network connection failed: Unable to reach the authentication service. Please check your connection.';
       }
       setErrorMessage(msg);
     } finally {

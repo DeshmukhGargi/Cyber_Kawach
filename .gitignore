@@ -26,6 +26,7 @@ server.js
 *.p12
 service-account*.json
 firebase-adminsdk*.json
+data/
 
 # Logs
 logs

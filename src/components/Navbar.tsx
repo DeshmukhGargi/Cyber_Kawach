@@ -185,6 +185,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onClick={async () => {
                         await logout();
                         setUserDropdownOpen(false);
+                        if (activePage === 'dashboard') {
+                          handleNavClick('home');
+                        }
                       }}
                       className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
                     >
@@ -260,6 +263,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={async () => {
                   await logout();
                   setMobileMenuOpen(false);
+                  if (activePage === 'dashboard') {
+                    handleNavClick('home');
+                  }
                 }}
                 className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
               >

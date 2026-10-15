@@ -19,6 +19,7 @@ import {
   BookOpen,
   User,
   ShieldAlert,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { CyberKawachLogo } from '../components/CyberKawachLogo.tsx';
@@ -112,6 +113,41 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         if (dom === 'url') weakestDomain = 'URL & Phishing';
       }
     });
+  }
+
+  if (!loading && !user) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center space-y-6">
+        <div className="flex justify-center">
+          <CyberKawachLogo size={48} variant="brand" glow={true} />
+        </div>
+        <div className="p-8 rounded-3xl bg-white border border-[#DCEBE7] shadow-xs space-y-5">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+            <Lock className="w-6 h-6" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-[#183B3A]">Authentication Required</h2>
+            <p className="text-xs text-[#526766] leading-relaxed">
+              Your Cyber Defense Command Center requires an active session to protect your personalized fitness metrics, badges, and scan logs.
+            </p>
+          </div>
+          <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => onNavigate('login')}
+              className="px-5 py-2.5 rounded-xl bg-[#38BDF8] hover:bg-[#0EA5E9] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              Sign In to Account
+            </button>
+            <button
+              onClick={() => onNavigate('signup')}
+              className="px-5 py-2.5 rounded-xl bg-white hover:bg-[#E8F8F5] border border-[#DCEBE7] text-[#183B3A] text-xs font-bold transition-all cursor-pointer"
+            >
+              Create Free Account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const displayName = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Cyber Guardian';

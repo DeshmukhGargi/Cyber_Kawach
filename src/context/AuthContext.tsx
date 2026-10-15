@@ -11,6 +11,21 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase.ts';
+import {
+  registerWithBackend,
+  loginWithBackend,
+  fetchCurrentUser,
+  logoutBackend,
+  resetPasswordBackend,
+  getStoredCachedUser,
+  AuthUser,
+} from '../services/authApi.ts';
+
+export interface UserMinimal {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
 
 export interface UserProfileData {
   userId: string;
@@ -21,7 +36,7 @@ export interface UserProfileData {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: User | UserMinimal | null;
   profile: UserProfileData | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -40,97 +55,265 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [user, setUser] = useState<User | UserMinimal | null>(() => getStoredCachedUser());
+  const [profile, setProfile] = useState<UserProfileData | null>(() => {
+    const cached = getStoredCachedUser();
+    return cached
+      ? {
+          userId: cached.uid,
+          email: cached.email,
+          displayName: cached.displayName,
+        }
+      : null;
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
+  // Initialize session: Check backend token and Firebase Auth
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        try {
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          const snap = await getDoc(userDocRef);
-          if (snap.exists()) {
-            setProfile(snap.data() as UserProfileData);
+    let mounted = true;
+
+    async function initializeSession() {
+      // 1. Check backend token session
+      try {
+        const backendUser = await fetchCurrentUser();
+        if (mounted && backendUser) {
+          setUser({
+            uid: backendUser.uid,
+            email: backendUser.email,
+            displayName: backendUser.displayName,
+          });
+          setProfile({
+            userId: backendUser.uid,
+            email: backendUser.email,
+            displayName: backendUser.displayName,
+          });
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Continue to Firebase Auth check
+      }
+
+      // 2. Fallback to Firebase onAuthStateChanged if active
+      if (!auth) {
+        const cached = getStoredCachedUser();
+        if (cached && mounted) {
+          setUser({
+            uid: cached.uid,
+            email: cached.email,
+            displayName: cached.displayName,
+          });
+          setProfile({
+            userId: cached.uid,
+            email: cached.email,
+            displayName: cached.displayName,
+          });
+        }
+        if (mounted) setLoading(false);
+        return;
+      }
+
+      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        if (!mounted) return;
+        if (currentUser) {
+          setUser(currentUser);
+          if (db) {
+            try {
+              const userDocRef = doc(db, 'users', currentUser.uid);
+              const snap = await getDoc(userDocRef);
+              if (snap.exists()) {
+                setProfile(snap.data() as UserProfileData);
+              } else {
+                const newProfile: UserProfileData = {
+                  userId: currentUser.uid,
+                  email: currentUser.email || '',
+                  displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+                  createdAt: new Date().toISOString(),
+                };
+                await setDoc(userDocRef, {
+                  ...newProfile,
+                  createdAtServer: serverTimestamp(),
+                });
+                setProfile(newProfile);
+              }
+            } catch {
+              setProfile({
+                userId: currentUser.uid,
+                email: currentUser.email || '',
+                displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+              });
+            }
           } else {
-            const newProfile: UserProfileData = {
+            setProfile({
               userId: currentUser.uid,
               email: currentUser.email || '',
               displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
-              createdAt: new Date().toISOString(),
-            };
-            await setDoc(userDocRef, {
-              ...newProfile,
-              createdAtServer: serverTimestamp(),
             });
-            setProfile(newProfile);
           }
-        } catch (err) {
-          console.warn('Failed to load user profile doc from Firestore:', err);
-          setProfile({
-            userId: currentUser.uid,
-            email: currentUser.email || '',
-            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
-          });
+        } else {
+          // If no backend session and no Firebase user
+          const cached = getStoredCachedUser();
+          if (!cached) {
+            setUser(null);
+            setProfile(null);
+          }
         }
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
-    });
+        setLoading(false);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    }
+
+    initializeSession();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email.trim(), password);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // 1. Primary: Login via secure backend auth
+    let backendSuccess = false;
+    try {
+      const { user: authUser } = await loginWithBackend(normalizedEmail, password);
+      setUser({
+        uid: authUser.uid,
+        email: authUser.email,
+        displayName: authUser.displayName,
+      });
+      setProfile({
+        userId: authUser.uid,
+        email: authUser.email,
+        displayName: authUser.displayName,
+      });
+      backendSuccess = true;
+    } catch (backendErr: any) {
+      // If backend reports invalid credentials, throw directly
+      if (backendErr.status === 401 || backendErr.message?.includes('Invalid email or password')) {
+        throw new Error('Invalid email or password combination. Please try again.');
+      }
+      // If it's a validation error, throw directly
+      if (backendErr.status === 400) {
+        throw backendErr;
+      }
+      // If network error, preserve network error message
+      if (backendErr.isNetworkError) {
+        throw backendErr;
+      }
+      throw backendErr;
+    }
+
+    // 2. Secondary: If Firebase Email/Password is also active, authenticate Firebase user
+    if (backendSuccess && auth) {
+      try {
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      } catch {
+        // Silently tolerate if Firebase email auth is not enabled in Firebase console
+      }
+    }
   };
 
   const register = async (email: string, password: string, displayName?: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-    const resolvedName = displayName?.trim() || email.split('@')[0];
-    if (resolvedName) {
-      try {
-        await updateProfile(userCredential.user, { displayName: resolvedName });
-      } catch (e) {
-        console.warn('Failed to update display name on user credential:', e);
-      }
-    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const resolvedName = displayName?.trim() || normalizedEmail.split('@')[0];
 
-    // Persist user profile in Firestore
+    // 1. Primary: Register via secure backend auth
     try {
-      const userDocRef = doc(db, 'users', userCredential.user.uid);
-      const userProfile: UserProfileData = {
-        userId: userCredential.user.uid,
-        email: email.trim(),
-        displayName: resolvedName,
+      const { user: authUser } = await registerWithBackend(resolvedName, normalizedEmail, password);
+      setUser({
+        uid: authUser.uid,
+        email: authUser.email,
+        displayName: authUser.displayName,
+      });
+      const newProfile: UserProfileData = {
+        userId: authUser.uid,
+        email: authUser.email,
+        displayName: authUser.displayName,
         createdAt: new Date().toISOString(),
       };
-      await setDoc(userDocRef, {
-        ...userProfile,
-        createdAtServer: serverTimestamp(),
-      });
-      setProfile(userProfile);
-    } catch (err) {
-      console.warn('Failed to store initial user profile in Firestore:', err);
+      setProfile(newProfile);
+    } catch (backendErr: any) {
+      if (backendErr.status === 409) {
+        throw new Error('An account with this email address already exists. Please sign in instead.');
+      }
+      if (backendErr.status === 400) {
+        throw new Error(backendErr.message || 'Please verify the registration details.');
+      }
+      if (backendErr.isNetworkError) {
+        throw backendErr;
+      }
+      throw backendErr;
+    }
+
+    // 2. Secondary: If Firebase Auth is enabled in the Firebase project, register with Firebase as well
+    if (auth) {
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+        if (userCredential?.user) {
+          try {
+            await updateProfile(userCredential.user, { displayName: resolvedName });
+          } catch {
+            // Non-critical
+          }
+          if (db) {
+            try {
+              const userDocRef = doc(db, 'users', userCredential.user.uid);
+              await setDoc(userDocRef, {
+                userId: userCredential.user.uid,
+                email: normalizedEmail,
+                displayName: resolvedName,
+                createdAt: new Date().toISOString(),
+                createdAtServer: serverTimestamp(),
+              });
+            } catch {
+              // Non-critical
+            }
+          }
+        }
+      } catch {
+        // Silently tolerate if Firebase console email auth is disabled; backend auth guarantees 100% operation
+      }
     }
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email.trim());
+    const normalizedEmail = email.trim().toLowerCase();
+    await resetPasswordBackend(normalizedEmail);
+
+    if (auth) {
+      try {
+        await sendPasswordResetEmail(auth, normalizedEmail);
+      } catch {
+        // Handled by backend reset response
+      }
+    }
   };
 
   const sendVerificationEmail = async () => {
-    if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser);
+    if (auth?.currentUser) {
+      try {
+        await sendEmailVerification(auth.currentUser);
+      } catch {
+        // Non-blocking
+      }
     }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    await logoutBackend();
+    if (auth) {
+      try {
+        await signOut(auth);
+      } catch {
+        // Non-blocking
+      }
+    }
+    setUser(null);
+    setProfile(null);
   };
 
   const openLoginModal = () => {

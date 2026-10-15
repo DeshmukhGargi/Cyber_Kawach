@@ -76,8 +76,14 @@ export async function saveScanToFirestore(
     createdAt: serverTimestamp(),
   };
 
-  const docRef = doc(db, 'users', userId, 'scans', scanId);
-  await setDoc(docRef, firestoreData);
+  if (db) {
+    try {
+      const docRef = doc(db, 'users', userId, 'scans', scanId);
+      await setDoc(docRef, firestoreData);
+    } catch (e) {
+      console.warn('Firestore scan save failed, proceeding with local record:', e);
+    }
+  }
 
   return {
     id: scanId,
@@ -94,6 +100,7 @@ export async function saveScanToFirestore(
 }
 
 export async function fetchUserScansFromFirestore(userId: string): Promise<ScanHistoryRecord[]> {
+  if (!db) return [];
   try {
     const scansCol = collection(db, 'users', userId, 'scans');
     const q = query(scansCol, orderBy('timestamp', 'desc'), limit(50));
@@ -131,8 +138,13 @@ export async function fetchUserScansFromFirestore(userId: string): Promise<ScanH
 }
 
 export async function deleteUserScanFromFirestore(userId: string, scanId: string): Promise<void> {
-  const docRef = doc(db, 'users', userId, 'scans', scanId);
-  await deleteDoc(docRef);
+  if (!db) return;
+  try {
+    const docRef = doc(db, 'users', userId, 'scans', scanId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('Could not delete scan from Firestore:', err);
+  }
 }
 
 export function computeScanMetrics(records: ScanHistoryRecord[]): UserScanMetrics {

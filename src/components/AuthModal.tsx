@@ -74,14 +74,22 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    if (!email.trim() || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = displayName.trim();
+
+    if (!normalizedEmail || !password) {
       setErrorMessage('Please provide both email and password.');
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setErrorMessage('Please enter a valid email address format.');
+      return;
+    }
+
     if (authModalMode === 'register') {
-      if (!displayName.trim()) {
-        setErrorMessage('Please enter your full name.');
+      if (!normalizedName || normalizedName.length < 2) {
+        setErrorMessage('Please enter your full name (minimum 2 characters).');
         return;
       }
       if (password.length < 6) {
@@ -89,7 +97,7 @@ export const AuthModal: React.FC = () => {
         return;
       }
       if (password !== confirmPassword) {
-        setErrorMessage('Passwords do not match.');
+        setErrorMessage('Passwords do not match. Please verify confirmation.');
         return;
       }
       if (!acceptTerms) {
@@ -101,23 +109,25 @@ export const AuthModal: React.FC = () => {
     setSubmitting(true);
     try {
       if (authModalMode === 'login') {
-        await login(email, password);
+        await login(normalizedEmail, password);
       } else {
-        await register(email, password, displayName);
+        await register(normalizedEmail, password, normalizedName);
       }
       handleClose();
     } catch (err: any) {
       console.error('Auth error:', err);
-      let msg = err.message || 'Authentication failed. Please verify credentials.';
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+      let msg = err.message || (authModalMode === 'login' ? 'Invalid email or password combination.' : 'Registration failed. Please try again.');
+      if (err.isNetworkError || err.message?.includes('Network error') || err.message?.includes('network')) {
+        msg = 'Network error: Unable to connect to server. Please check your connection.';
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
         msg = 'Invalid email or password combination.';
       } else if (err.code === 'auth/user-not-found') {
         msg = 'No account found with this email.';
-      } else if (err.code === 'auth/email-already-in-use') {
-        msg = 'An account already exists with this email.';
-      } else if (err.code === 'auth/weak-password') {
+      } else if (err.code === 'auth/email-already-in-use' || err.message?.includes('already exists')) {
+        msg = 'An account already exists with this email address. Please sign in instead.';
+      } else if (err.code === 'auth/weak-password' || err.message?.includes('weak')) {
         msg = 'Password is too weak. Please use at least 6 characters.';
-      } else if (err.code === 'auth/invalid-email') {
+      } else if (err.code === 'auth/invalid-email' || err.message?.includes('valid email')) {
         msg = 'Invalid email address format.';
       }
       setErrorMessage(msg);

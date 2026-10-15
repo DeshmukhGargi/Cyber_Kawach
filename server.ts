@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { analyzeWithGemini } from './server/analyzer/aiAnalyzer.ts';
 import { fetchThreatIntelligence } from './server/feedService.ts';
+import { AuthService } from './server/authService.ts';
 import type { AnalysisRequest } from './src/types/cyber.ts';
 
 dotenv.config();
@@ -59,6 +60,139 @@ app.get('/api/health', (req: Request, res: Response) => {
     service: 'Cyber Kawach Backend',
     version: '1.0.0',
     gemini_configured: Boolean(process.env.GEMINI_API_KEY),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ==========================================
+// AUTHENTICATION ENDPOINTS
+// ==========================================
+
+// Register new user account
+app.post('/api/auth/register', (req: Request, res: Response) => {
+  try {
+    const { fullName, email, password, confirmPassword } = req.body || {};
+
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password confirmation does not match.',
+      });
+    }
+
+    const result = AuthService.register({ fullName, email, password });
+    return res.status(201).json({
+      success: true,
+      message: 'Account registered successfully.',
+      user: result.user,
+      token: result.token,
+    });
+  } catch (err: any) {
+    const status = err.status || 500;
+    const message = err.message || 'An unexpected error occurred during registration. Please try again.';
+    return res.status(status).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+// Login existing user
+app.post('/api/auth/login', (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body || {};
+    const result = AuthService.login({ email, password });
+    return res.json({
+      success: true,
+      message: 'Login successful.',
+      user: result.user,
+      token: result.token,
+    });
+  } catch (err: any) {
+    const status = err.status || 500;
+    const message = err.message || 'An unexpected error occurred during login. Please try again.';
+    return res.status(status).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+// Verify session token / fetch current user
+app.get('/api/auth/me', (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: 'No authorization token provided.',
+      });
+    }
+
+    const token = authHeader.substring(7).trim();
+    const user = AuthService.getUserByToken(token);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Session expired or invalid token. Please log in again.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      user,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to verify authentication token.',
+    });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      AuthService.logout(token);
+    }
+    return res.json({
+      success: true,
+      message: 'Logged out successfully.',
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: 'Logout encountered an issue.',
+    });
+  }
+});
+
+// Password reset request endpoint
+app.post('/api/auth/reset-password', (req: Request, res: Response) => {
+  try {
+    const { email } = req.body || {};
+    const result = AuthService.requestPasswordReset(email);
+    return res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (err: any) {
+    const status = err.status || 500;
+    return res.status(status).json({
+      success: false,
+      error: err.message || 'Failed to process password reset request.',
+    });
+  }
+});
+
+// Authentication service status
+app.get('/api/auth/health', (req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    auth_service: 'Cyber Kawach Secure Credential Engine',
     timestamp: new Date().toISOString(),
   });
 });
